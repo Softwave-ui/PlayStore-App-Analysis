@@ -1,0 +1,145 @@
+---
+title: "PlayStore App Analysis"
+output: html_document
+---
+
+```{r}
+# setup modules
+install.packages("tidyverse")
+install.packages("dlookr")
+install.packages("flextable")
+library(tidyverse)
+library(ggplot2)
+library(dlookr)
+library(flextable)
+library(lubridate)
+```
+
+```{r}
+# load csv into dataframe and create draft copy
+appinfo <- read.csv("googleplaystore.csv")
+df <- appinfo
+```
+
+```{r}
+str(df)   # Col:10841 Row:13
+summary(df) # We see NA's, and an outlier in Rating
+```
+
+```{r}
+# NA's check all column
+colSums(is.na(df))
+```
+
+```{r}
+# distribution of Ratings
+boxplot(df$Rating) #investigation of outlier shows it's abnormal should be removed
+```
+
+```{r}
+# removing the abnormal row while maintaining NA's
+df <- df[df$Rating !=19 | is.na(df$Rating), ]
+```
+
+```{r}
+# check that one row was removed
+dim(df)
+```
+
+```{r}
+# Convert to int cols: Reviews , Installs
+df$Reviews <- as.integer(df$Reviews, trim_ws = TRUE)
+df$Installs <- as.integer(parse_number(df$Installs, trim_ws = TRUE))
+
+# Convert to num: Price
+df$Price <- parse_number(df$Price, trim_ws = TRUE)
+
+# Convert to date: Last.Updated
+df$Last.Updated <- mdy(df$Last.Updated)
+```
+
+```{r}
+# check df structure
+str(df)
+```
+
+```{r}
+# summary
+flextable(diagnose_numeric(df))
+```
+
+```{r}
+#check for duplicate apps
+sum(duplicated(df$App)) # 1181 duplicate App names
+sum(duplicated(df)) # 483 exact duplicate rows
+```
+
+```{r}
+# remove full duplicate rows in our dataset
+df <- distinct(df)
+```
+
+```{r}
+#check for number of partial  
+ df %>% 
+  count(df$App,df$Rating,df$Last.Updated) %>% 
+  filter(n > 1) 
+
+# remove partial duplicates based on last.updated
+df2 <-
+  df[rev(order(as.Date(df$Last.Updated, format="%Y/%m/%d"))),] %>%
+  distinct(App, .keep_all = TRUE)
+
+# check for anymore duplicate apps
+sum(duplicated(df2$App))
+```
+
+```{r}
+# check skew of Rating, we see that it is left skewed
+hist(df2$Rating)
+```
+```{r}
+# replace na with median because of left skew
+df2 <-  df2 %>% 
+mutate(Rating = ifelse(is.na(Rating), median(Rating, na.rm = T), Rating))
+
+#check for na
+summary(df2)
+```
+
+```{r}
+#create calculated measures
+avg_rating <- df2 %>% 
+  group_by(Category) %>%
+  summarise(Rating=mean(Rating))
+
+avg_price <- df2 %>% 
+  group_by(Category) %>%
+  summarise(Price=mean(Price))
+
+avg_installs <- df2 %>%
+  group_by(Category) %>%
+  summarise(Installs=mean(Installs))
+```
+
+
+```{r}
+ggplot(avg_rating, 
+       aes(Category, Rating)) + geom_point() + theme(axis.text.x = element_text(angle = 90)) + ggtitle("Category vs Rating")
+```
+
+```{r}
+ggplot(avg_price, aes(Category, Price)) + geom_point() +  theme(axis.text.x = element_text(angle = 90)) + ggtitle("Category vs Price")
+```
+```{r}
+ggplot(avg_installs, aes(Category, Installs)) + geom_col() + theme(axis.text.x = element_text(angle = 90)) + ggtitle("Category vs Installs")
+```
+
+
+
+```{r}
+#export dataframe as csv for futher visualization in power bi
+write.csv(df2, "final_appdata.csv")
+```
+
+
