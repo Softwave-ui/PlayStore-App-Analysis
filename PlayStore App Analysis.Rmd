@@ -124,8 +124,7 @@ avg_installs <- df2 %>%
 
 
 ```{r}
-ggplot(avg_rating, 
-       aes(Category, Rating)) + geom_point() + theme(axis.text.x = element_text(angle = 90)) + ggtitle("Category vs Rating")
+ggplot(avg_rating, aes(Category, Rating)) + geom_point() + theme(axis.text.x = element_text(angle = 90)) + ggtitle("Category vs Rating")
 ```
 
 ```{r}
